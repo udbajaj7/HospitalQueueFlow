@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, uuid, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -29,6 +29,11 @@ export const DepartmentCategoryEnum = {
   PHARMACY: 'Pharmacy',
   RADIOLOGY: 'Radiology',
   OPD_CONSULTATION: 'OPD Consultation',
+} as const;
+
+export const TokenSourceEnum = {
+  WALKIN: 'walkin',
+  APPOINTMENT: 'appointment',
 } as const;
 
 // Define database tables
@@ -67,6 +72,8 @@ export const tokens = pgTable("tokens", {
   startAt: timestamp("start_at"),
   endAt: timestamp("end_at"),
   position: serial("position"), // For queue reordering
+  source: text("source").notNull().default(TokenSourceEnum.WALKIN),
+  appointmentTime: timestamp("appointment_time"), // For booked appointments
 });
 
 export const departments = pgTable("departments", {
@@ -82,6 +89,17 @@ export const doctors = pgTable("doctors", {
   name: text("name").notNull(),
   departmentCode: text("department_code").notNull().references(() => departments.code),
   active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  appointmentSlotsPerHour: integer("appointment_slots_per_hour").notNull().default(4), // max booked appointments per hour
+  walkInSlotsPerHour: integer("walk_in_slots_per_hour").notNull().default(2), // max walk-ins per hour
+});
+
+export const availabilities = pgTable("availabilities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  doctorId: uuid("doctor_id").notNull().references(() => doctors.id, { onDelete: "cascade" }),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Sunday…6=Saturday
+  startHour: integer("start_hour").notNull(), // 0–23
+  endHour: integer("end_hour").notNull(), // 1–24, non-inclusive
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -131,6 +149,11 @@ export const insertDoctorSchema = createInsertSchema(doctors).omit({
   createdAt: true,
 });
 
+export const insertAvailabilitySchema = createInsertSchema(availabilities).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Define types from schemas
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -149,6 +172,9 @@ export type InsertDoctor = z.infer<typeof insertDoctorSchema>;
 
 export type NotificationLog = typeof notificationLogs.$inferSelect;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+
+export type Availability = typeof availabilities.$inferSelect;
+export type InsertAvailability = z.infer<typeof insertAvailabilitySchema>;
 
 // Token response with patient data and estimated wait
 export type TokenResponse = Token & {
@@ -191,4 +217,22 @@ export type DashboardStats = {
   servedToday: number;
   noShows: number;
   avgWaitTime: number;
+};
+
+// Doctor availability slot
+export type DoctorSlot = {
+  bookedAppointments: number;
+  walkInsIssued: number;
+  appointmentSlotsPerHour: number;
+  walkInSlotsPerHour: number;
+  isAvailable: boolean;
+  remainingWalkInSlots: number;
+};
+
+// Availability window for frontend representation
+export type AvailabilityWindow = {
+  dayOfWeek: number;
+  startHour: number;
+  endHour: number;
+  id?: string;
 };
