@@ -18,8 +18,7 @@ const AdminDepartments = () => {
   // Create department mutation
   const createDepartmentMutation = useMutation({
     mutationFn: async (department: any) => {
-      const response = await apiRequest('POST', '/api/departments', department);
-      return response.json();
+      return await apiRequest('POST', '/api/departments', department);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/departments'] });

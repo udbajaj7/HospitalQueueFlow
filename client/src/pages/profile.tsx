@@ -80,10 +80,15 @@ export default function ProfilePage() {
   // Change password mutation
   const changePasswordMutation = useMutation({
     mutationFn: async (data: PasswordFormValues) => {
-      return await apiRequest('PUT', `/api/users/${user?.id}/password`, {
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      });
+      try {
+        const response = await apiRequest('PUT', `/api/users/${user?.id}/password`, {
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+        });
+        return response;
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : 'Failed to update password');
+      }
     },
     onSuccess: () => {
       toast({
