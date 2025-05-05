@@ -1,0 +1,100 @@
+enhance it with Doctor Availability & Appointment vs. Walk-in Logic as described in the RGCIRC requirements document.
+
+1. Prisma Schema Updates
+
+Doctor model must include:
+
+prisma
+Copy
+Edit
+model Doctor {
+  id              String   @id @default(uuid())
+  name            String
+  departmentCode  String
+  department      Department @relation(fields: [departmentCode], references: [code])
+  // New fields:
+  availabilities  Availability[]  @relation("DoctorAvailability")
+  appointmentSlotsPerHour Int   // max booked appointments per hour
+  walkInSlotsPerHour      Int   // max walk-ins per hour
+  tokens          Token[]   @relation("DoctorQueue")
+}
+
+model Availability {
+  id        String   @id @default(uuid())
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  doctorId  String
+  dayOfWeek Int      // 0=Sunday…6=Saturday
+  startHour Int      // 0–23
+  endHour   Int      // 1–24, non-inclusive
+}
+Token model extended (already has checkInAt, startAt, endAt).
+
+2. Doctor Creation UI (Admin)
+
+On Create/Edit Doctor form under /admin:
+
+Inputs for daily availabilities: for each weekday, a multiselect or table to enter one or more [startHour, endHour] ranges.
+
+Numeric inputs for appointmentSlotsPerHour and walkInSlotsPerHour.
+
+Persist these fields via POST /api/admin/doctors and PUT /api/admin/doctors/:id.
+
+3. Kiosk Token Issuance Logic
+
+When kiosk user requests a token (walk-in):
+
+Read session.selectedDoctorId or kiosk-selected doctor.
+
+Determine current hour and dayOfWeek.
+
+Verify that the doctor has an availability record covering this hour.
+
+If not available, return HTTP 400 with “Doctor not available now.”
+
+Count today’s booked appointments for that doctor and hour (Token with source=appointment and appointmentTime in this slot).
+
+Count today’s issued walk-ins for that doctor and hour (Token with source=walkin and createdAt in this slot).
+
+If walkInsIssued < walkInSlotsPerHour OR (bookedAppointments < appointmentSlotsPerHour AND walkInsIssued < (appointmentSlotsPerHour – bookedAppointments) + walkInSlotsPerHour), allow issuance.
+
+In other words, let unused appointment capacity overflow to walk-ins.
+
+Otherwise, return HTTP 429 “Walk-in quota full for this hour.”
+
+If allowed, create Token with source = "walkin", assign doctorId, set checkInAt = now(), then existing flow: compute estimatedWait, emit events, and optionally send WhatsApp.
+
+4. Edge Cases & Errors
+
+If appointment no-shows occur (an appointment token not checked in by cut-off time), automatically convert that slot to walk-in capacity at cut-off (e.g., 15 minutes into slot).
+
+If multiple availability ranges overlap or a doctor is double-booked, return a server error and log for admin review.
+
+If time crosses midnight or DST shift, treat each hour strictly by the startHour–endHour semantics.
+
+5. API & Backend Requirements
+
+GET /api/doctors/:id/availability → list of Availability records.
+
+GET /api/doctors/:id/slots?date=YYYY-MM-DD&hour=H → return { bookedAppointments, walkInsIssued, appointmentSlotsPerHour, walkInSlotsPerHour }.
+
+POST /api/kiosk/tokens → implements the kiosk logic above (use source: walkin).
+
+Cron or Scheduled Function /api/appointments/release → runs at each slot’s cut-off to convert no-shows into walk-in slots.
+
+Add unit tests for the slot-quota logic.
+
+6. Frontend Integration
+
+In kiosk form, when doctor is selected, fetch /api/doctors/:id/slots to show live counts and “Walk-in slots left: X” before submitting.
+
+Disable “Get Token” button if slots are full, showing “No walk-in slots available—please try later.”
+
+7. Commit & Migration
+
+Update schema.prisma, run npx prisma migrate dev --name doctor-availability.
+
+Seed sample availabilities in prisma/seed.ts for testing.
+
+Commit each feature incrementally with clear git messages.
+
+Deliverable: Fully functional doctor availability & walk-in quota system in the existing Next.js Replit app, with UI, API routes, backend logic, migrations, and tests—aligned 1:1 with the RGCIRC PDF requirements.
