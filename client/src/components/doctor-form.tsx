@@ -34,6 +34,14 @@ import { insertDoctorSchema, type Doctor } from "@shared/schema";
 const doctorFormSchema = insertDoctorSchema.extend({
   name: z.string().min(2, "Name must be at least 2 characters"),
   departmentCode: z.string().min(1, "Department is required"),
+  appointmentSlotsPerHour: z.coerce.number()
+    .int("Must be a whole number")
+    .min(0, "Minimum is 0")
+    .max(10, "Maximum is 10"),
+  walkInSlotsPerHour: z.coerce.number()
+    .int("Must be a whole number")
+    .min(0, "Minimum is 0")
+    .max(10, "Maximum is 10"),
 });
 
 type DoctorFormValues = z.infer<typeof doctorFormSchema>;
@@ -51,6 +59,8 @@ export function DoctorForm({ doctor, onSubmit, isLoading = false, departments }:
     name: "",
     departmentCode: "",
     active: true,
+    appointmentSlotsPerHour: 4, // Default to 4 appointments per hour
+    walkInSlotsPerHour: 2,      // Default to 2 walk-ins per hour
   };
 
   const form = useForm<DoctorFormValues>({
@@ -125,6 +135,54 @@ export function DoctorForm({ doctor, onSubmit, isLoading = false, departments }:
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="appointmentSlotsPerHour"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Appointment Slots Per Hour</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="10" 
+                        {...field} 
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Maximum number of appointments the doctor can handle per hour
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="walkInSlotsPerHour"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Walk-in Slots Per Hour</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="10" 
+                        {...field} 
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Maximum number of walk-in patients the doctor can see per hour
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}

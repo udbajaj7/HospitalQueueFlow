@@ -1,0 +1,64 @@
+You are an expert full-stack developer working on a Next.js + Prisma healthcare queue management app. Backend logic for doctor availability, appointment slot limits, and walk-in quotas is already implemented. Now complete the UI integration and user flow for both Admin panel (doctor creation) and Kiosk screen (walk-in and check-in) based on the requirements below:
+
+🔧 ADMIN PANEL: Create/Edit Doctor Page
+
+✅ Add UI fields to capture:
+
+Availability for each day of the week:
+
+For each weekday (Mon–Sun), allow entering multiple time ranges using time pickers (e.g., 9:00–13:00, 14:00–17:00).
+
+Store this as an array of { dayOfWeek, startHour, endHour }.
+
+Numeric inputs for:
+
+appointmentSlotsPerHour
+
+walkInSlotsPerHour
+
+✅ On save:
+
+Send this data to the backend via the existing /api/admin/doctors endpoint.
+
+Format the data appropriately to persist in the Doctor and Availability Prisma models.
+
+🖥️ KIOSK SCREEN
+
+✅ Walk-in Patient Flow:
+
+Show a dropdown or selection card for available doctors (only those available at current time).
+
+On doctor selection:
+
+Call /api/doctors/:id/slots?date=TODAY&hour=NOW to fetch:
+
+Available walk-in slots for this hour.
+
+If walk-ins are allowed (based on limits and no-shows).
+
+Show walk-in quota remaining. Disable "Get Token" button if walk-in quota for the hour is full.
+
+On “Get Token,” call the walk-in token API. Display token ID and wait estimate.
+
+✅ Check-In Flow for Appointment Patients:
+
+Add a “Check-in with Appointment” tab/button on kiosk screen.
+
+Ask for patient’s appointment code or phone number.
+
+Verify against appointments (via API, e.g., /api/appointments/verify).
+
+If valid and within check-in window (30 minutes before/after slot), generate their token and show it.
+
+If too early/late, show appropriate message: “Not eligible to check-in yet” or “Missed appointment – please contact help desk.”
+
+⚠️ Validation & UX Enhancements
+
+All time ranges should be validated (no overlaps on same day).
+
+Highlight unavailable hours in the kiosk UI if doctor is not available.
+
+Admin form should dynamically show errors if a day is missing availability.
+
+Use date-fns or dayjs for all local time-based checks.
+
