@@ -272,29 +272,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get the most recently called token
       const sortedTokens = [...results].sort((a, b) => {
         // Convert calledAt (or fall back to issuedAt) to dates for comparison 
-        const dateA = new Date(a.calledAt || a.issuedAt).getTime();
-        const dateB = new Date(b.calledAt || b.issuedAt).getTime();
+        const dateA = a.calledAt ? new Date(a.calledAt).getTime() 
+                                 : a.issuedAt ? new Date(a.issuedAt).getTime() : 0;
+        const dateB = b.calledAt ? new Date(b.calledAt).getTime() 
+                                 : b.issuedAt ? new Date(b.issuedAt).getTime() : 0;
         return dateB - dateA; // Most recent first
       });
       
       // Get the token
       const currentToken = sortedTokens[0];
-      const issuedTime = new Date(currentToken.issuedAt);
+      const issuedTime = currentToken.issuedAt ? new Date(currentToken.issuedAt) : new Date();
       const currentTime = new Date();
       const waitTimeInMinutes = Math.floor(
         (currentTime.getTime() - issuedTime.getTime()) / (1000 * 60)
       );
       
       // Format timestamps for consistent serialization
-      const issuedAtStr = currentToken.issuedAt instanceof Date 
-        ? currentToken.issuedAt.toISOString() 
-        : new Date(currentToken.issuedAt).toISOString();
+      let issuedAtStr = '';
+      if (currentToken.issuedAt) {
+        try {
+          issuedAtStr = currentToken.issuedAt instanceof Date 
+            ? currentToken.issuedAt.toISOString() 
+            : new Date(String(currentToken.issuedAt)).toISOString();
+        } catch (err) {
+          console.error('Error formatting issuedAt date:', err);
+          issuedAtStr = new Date().toISOString();
+        }
+      } else {
+        issuedAtStr = new Date().toISOString();
+      }
         
-      const calledAtStr = currentToken.calledAt instanceof Date 
-        ? currentToken.calledAt.toISOString() 
-        : currentToken.calledAt 
-          ? new Date(currentToken.calledAt).toISOString() 
-          : null;
+      let calledAtStr = null;
+      if (currentToken.calledAt) {
+        try {
+          calledAtStr = currentToken.calledAt instanceof Date 
+            ? currentToken.calledAt.toISOString() 
+            : new Date(String(currentToken.calledAt)).toISOString();
+        } catch (err) {
+          console.error('Error formatting calledAt date:', err);
+          calledAtStr = null;
+        }
+      }
       
       const resultToken = {
         id: currentToken.id,
