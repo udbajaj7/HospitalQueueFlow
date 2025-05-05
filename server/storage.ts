@@ -142,7 +142,7 @@ export class DatabaseStorage implements IStorage {
     return token;
   }
 
-  async createToken(tokenData: InsertToken): Promise<TokenResponse> {
+  async createToken(tokenData: InsertToken & { doctorId?: string }): Promise<TokenResponse> {
     // Generate token number
     const tokenNumber = await this.generateTokenNumber(tokenData.departmentCode);
     
@@ -156,22 +156,20 @@ export class DatabaseStorage implements IStorage {
     const source = tokenData.source || TokenSourceEnum.WALKIN;
     const now = new Date();
     
-    // For OPD Consultation, check doctor availability and slot capacity
-    let doctorId = tokenData.doctorId;
-    if (department && department.category === DepartmentCategoryEnum.OPD_CONSULTATION && doctorId) {
-      // If this is a walk-in request for a specific doctor, verify slots are available
+    // Check doctor availability for OPD consultations
+    if (department?.category === DepartmentCategoryEnum.OPD_CONSULTATION && tokenData.doctorId) {
+      // If this is a walk-in request, verify doctor availability and slot capacity
       if (source === TokenSourceEnum.WALKIN) {
-        // Get current hour for availability check
         const currentHour = now.getHours();
         
         // Check if doctor is available now
-        const isAvailable = await this.checkDoctorAvailability(doctorId, now, currentHour);
+        const isAvailable = await this.checkDoctorAvailability(tokenData.doctorId, now, currentHour);
         if (!isAvailable) {
           throw new Error("Doctor is not available during this hour");
         }
         
         // Check if walk-in slots are available
-        const slot = await this.getDoctorSlot(doctorId, now, currentHour);
+        const slot = await this.getDoctorSlot(tokenData.doctorId, now, currentHour);
         if (slot.remainingWalkInSlots <= 0) {
           throw new Error("No walk-in slots available for this doctor at this time");
         }
@@ -180,21 +178,29 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Set the check-in time for walk-ins
-    let checkInAt = undefined;
-    if (source === TokenSourceEnum.WALKIN) {
-      checkInAt = now;
+    const checkInAt = source === TokenSourceEnum.WALKIN ? now : undefined;
+    
+    // Build insertion data
+    const insertData: any = {
+      departmentCode: tokenData.departmentCode,
+      patientId: tokenData.patientId,
+      priority: tokenData.priority || PriorityEnum.NORMAL,
+      status: tokenData.status || StatusEnum.ISSUED,
+      source,
+      tokenNumber,
+      checkInAt,
+      appointmentTime: tokenData.appointmentTime
+    };
+    
+    // Add doctorId if provided
+    if (tokenData.doctorId) {
+      insertData.doctorId = tokenData.doctorId;
     }
     
     // Create token
     const [token] = await db
       .insert(tokens)
-      .values({ 
-        ...tokenData, 
-        tokenNumber, 
-        doctorId,
-        source,
-        checkInAt
-      })
+      .values(insertData)
       .returning();
 
     // Get patient details
@@ -881,8 +887,8 @@ export class DatabaseStorage implements IStorage {
   
   async deleteDoctorAvailability(id: string): Promise<boolean> {
     try {
-      const result = await db.delete(availabilities).where(eq(availabilities.id, id));
-      return result.rowCount > 0;
+      await db.delete(availabilities).where(eq(availabilities.id, id));
+      return true;
     } catch (error) {
       console.error('Error deleting availability:', error);
       return false;
