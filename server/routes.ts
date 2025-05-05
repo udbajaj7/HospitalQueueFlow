@@ -29,8 +29,10 @@ import {
   insertDepartmentSchema,
   insertUserSchema,
   insertDoctorSchema,
+  insertAvailabilitySchema,
   RoleEnum,
   StatusEnum,
+  TokenSourceEnum,
 } from "@shared/schema";
 
 // Configure session store
@@ -248,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: tokens.status,
           issuedAt: tokens.issuedAt,
           calledAt: tokens.calledAt,
-          isWalkIn: tokens.isWalkIn,
+          source: tokens.source,
         })
         .from(tokens)
         .leftJoin(patients, eq(tokens.patientId, patients.id))
@@ -306,7 +308,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         waitTime: waitTimeInMinutes,
         issuedAt: issuedAtStr,
         calledAt: calledAtStr,
-        isWalkIn: currentToken.isWalkIn
+        source: currentToken.source,
+        isWalkIn: currentToken.source === TokenSourceEnum.WALKIN
       };
       
       console.log('Current token:', resultToken);
@@ -576,6 +579,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: 'Doctor deleted successfully' });
     } catch (error) {
       console.error('Error deleting doctor:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
+  // Doctor availability routes
+  app.get('/api/doctors/:id/availabilities', isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const availabilities = await storage.getDoctorAvailabilities(id);
+      res.json(availabilities);
+    } catch (error) {
+      console.error('Error fetching doctor availabilities:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
+  app.post('/api/doctors/:id/availabilities', isAuthenticated, checkRole([RoleEnum.ADMIN]), validateRequest(insertAvailabilitySchema), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = { ...req.body, doctorId: id };
+      
+      // Validation for time slots
+      if (data.startHour >= data.endHour) {
+        return res.status(400).json({ message: 'End hour must be greater than start hour' });
+      }
+      
+      if (data.startHour < 0 || data.startHour > 23 || data.endHour < 1 || data.endHour > 24) {
+        return res.status(400).json({ message: 'Hours must be between 0-23 for start and 1-24 for end' });
+      }
+      
+      if (data.dayOfWeek < 0 || data.dayOfWeek > 6) {
+        return res.status(400).json({ message: 'Day of week must be between 0 (Sunday) and 6 (Saturday)' });
+      }
+      
+      const availability = await storage.createDoctorAvailability(data);
+      res.status(201).json(availability);
+    } catch (error) {
+      console.error('Error creating doctor availability:', error);
+      
+      // Handle overlapping availability error
+      if (error instanceof Error && error.message.includes('Overlapping availability')) {
+        return res.status(400).json({ message: error.message });
+      }
+      
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
+  app.put('/api/doctors/availabilities/:id', isAuthenticated, checkRole([RoleEnum.ADMIN]), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Validation for time slots
+      if (req.body.startHour !== undefined && req.body.endHour !== undefined) {
+        if (req.body.startHour >= req.body.endHour) {
+          return res.status(400).json({ message: 'End hour must be greater than start hour' });
+        }
+        
+        if (req.body.startHour < 0 || req.body.startHour > 23 || req.body.endHour < 1 || req.body.endHour > 24) {
+          return res.status(400).json({ message: 'Hours must be between 0-23 for start and 1-24 for end' });
+        }
+      }
+      
+      if (req.body.dayOfWeek !== undefined && (req.body.dayOfWeek < 0 || req.body.dayOfWeek > 6)) {
+        return res.status(400).json({ message: 'Day of week must be between 0 (Sunday) and 6 (Saturday)' });
+      }
+      
+      const availability = await storage.updateDoctorAvailability(id, req.body);
+      
+      if (!availability) {
+        return res.status(404).json({ message: 'Availability not found' });
+      }
+      
+      res.json(availability);
+    } catch (error) {
+      console.error('Error updating doctor availability:', error);
+      
+      // Handle overlapping availability error
+      if (error instanceof Error && error.message.includes('Overlapping availability')) {
+        return res.status(400).json({ message: error.message });
+      }
+      
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
+  app.delete('/api/doctors/availabilities/:id', isAuthenticated, checkRole([RoleEnum.ADMIN]), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteDoctorAvailability(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: 'Availability not found or could not be deleted' });
+      }
+      
+      res.json({ message: 'Availability deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting availability:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
+  // Doctor slot availability checking
+  app.get('/api/doctors/:id/slots', isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { date, hour } = req.query;
+      
+      if (!date || typeof date !== 'string') {
+        return res.status(400).json({ message: 'Date parameter is required (YYYY-MM-DD format)' });
+      }
+      
+      if (!hour || typeof hour !== 'string') {
+        return res.status(400).json({ message: 'Hour parameter is required (0-23)' });
+      }
+      
+      // Parse date and hour
+      const parsedDate = new Date(date);
+      const parsedHour = parseInt(hour, 10);
+      
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ message: 'Invalid date format. Use YYYY-MM-DD' });
+      }
+      
+      if (isNaN(parsedHour) || parsedHour < 0 || parsedHour > 23) {
+        return res.status(400).json({ message: 'Invalid hour. Must be between 0-23' });
+      }
+      
+      const slot = await storage.getDoctorSlot(id, parsedDate, parsedHour);
+      res.json(slot);
+    } catch (error) {
+      console.error('Error checking doctor slot availability:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });
