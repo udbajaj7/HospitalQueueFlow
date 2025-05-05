@@ -22,7 +22,27 @@ export type LoginCredentials = z.infer<typeof loginSchema>;
 
 // Login function
 export async function login(credentials: LoginCredentials): Promise<{ user: User }> {
-  return apiRequest('POST', "/api/login", credentials);
+  try {
+    const response = await fetch("/api/login", {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(credentials)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Login failed with status ${response.status}: ${errorText}`);
+      throw new Error(errorText || 'Invalid credentials');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Login error:", error);
+    throw error;
+  }
 }
 
 // Logout function
@@ -51,8 +71,27 @@ export async function logout(): Promise<void> {
 // Get current user function
 export async function getCurrentUser(): Promise<{ user: User } | null> {
   try {
-    return await apiRequest('GET', "/api/user");
+    const response = await fetch("/api/user", {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        console.log('User not authenticated');
+        return null;
+      }
+      const errorText = await response.text();
+      console.error(`Get user failed with status ${response.status}: ${errorText}`);
+      throw new Error(errorText || 'Failed to get current user');
+    }
+    
+    return await response.json();
   } catch (error) {
+    console.error("Get current user error:", error);
     return null;
   }
 }
