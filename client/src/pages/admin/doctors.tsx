@@ -34,15 +34,15 @@ export default function DoctorsPage() {
 
   // Fetch doctors
   const {
-    data: doctors,
+    data: doctors = [],
     isLoading,
     error,
-  } = useQuery({
+  } = useQuery<Doctor[]>({
     queryKey: ["/api/doctors"],
   });
 
   // Fetch departments for reference
-  const { data: departments } = useQuery({
+  const { data: departments = [] } = useQuery<Array<{ code: string; name: string }>>({
     queryKey: ["/api/departments"],
   });
 

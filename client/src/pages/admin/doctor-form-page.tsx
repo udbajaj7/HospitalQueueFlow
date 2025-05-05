@@ -19,7 +19,10 @@ export default function DoctorFormPage() {
   const [saveSuccessful, setSaveSuccessful] = useState(false);
   
   // Fetch departments data
-  const { data: departments, isLoading: isLoadingDepartments } = useQuery({
+  const { 
+    data: departments = [], 
+    isLoading: isLoadingDepartments 
+  } = useQuery<Array<{ code: string; name: string }>>({
     queryKey: ["/api/departments"],
   });
 
@@ -27,16 +30,16 @@ export default function DoctorFormPage() {
   const { 
     data: doctor, 
     isLoading: isLoadingDoctor 
-  } = useQuery({
+  } = useQuery<Doctor>({
     queryKey: ["/api/doctors", id],
     enabled: !!id,
   });
   
   // Fetch doctor availability if editing
   const {
-    data: availabilities,
+    data: availabilities = [],
     isLoading: isLoadingAvailabilities
-  } = useQuery({
+  } = useQuery<Array<{ id?: string; dayOfWeek: number; startHour: number; endHour: number }>>({
     queryKey: ["/api/doctors", id, "availabilities"],
     enabled: !!id,
   });
