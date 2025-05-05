@@ -1,6 +1,6 @@
 import { db, pool } from "./db";
-import { and, desc, eq, gte, lte, sql, not, inArray } from "drizzle-orm";
-import { formatISO, startOfDay } from "date-fns";
+import { and, desc, eq, gte, lte, sql, not, inArray, between, gt } from "drizzle-orm";
+import { formatISO, startOfDay, format, parse, addMinutes, isBefore, isAfter, getDay, getHours } from "date-fns";
 import {
   departments,
   patients,
@@ -8,6 +8,7 @@ import {
   users,
   doctors,
   notificationLogs,
+  availabilities,
   type User,
   type InsertUser,
   type Patient,
@@ -24,9 +25,14 @@ import {
   type QueueItem,
   type DepartmentStat,
   type DashboardStats,
+  type Availability,
+  type InsertAvailability,
+  type AvailabilityWindow,
+  type DoctorSlot,
   StatusEnum,
   DepartmentCategoryEnum,
   PriorityEnum,
+  TokenSourceEnum,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -65,6 +71,14 @@ export interface IStorage {
   updateDoctor(id: string, data: Partial<Doctor>): Promise<Doctor | undefined>;
   listDoctors(departmentCode?: string): Promise<Doctor[]>;
   deleteDoctor(id: string): Promise<boolean>;
+  
+  // Doctor availability methods
+  getDoctorAvailabilities(doctorId: string): Promise<Availability[]>;
+  createDoctorAvailability(availability: InsertAvailability): Promise<Availability>;
+  updateDoctorAvailability(id: string, data: Partial<Availability>): Promise<Availability | undefined>;
+  deleteDoctorAvailability(id: string): Promise<boolean>;
+  getDoctorSlot(doctorId: string, date: Date, hour: number): Promise<DoctorSlot>;
+  checkDoctorAvailability(doctorId: string, date: Date, hour: number): Promise<boolean>;
   
   // Stats methods
   getDepartmentStats(): Promise<DepartmentStat[]>;
@@ -138,16 +152,49 @@ export class DatabaseStorage implements IStorage {
     // Get department to check if it's OPD consultation
     const department = await this.getDepartment(tokenData.departmentCode);
     
-    // For OPD Consultation departments, we need to check if doctor is assigned
-    let doctorId = undefined;
-    if (department && department.category === DepartmentCategoryEnum.OPD_CONSULTATION) {
-      // For OPD we should require doctor assignment, but we'll handle that in the routes
+    // Initialize source as walk-in if not specified
+    const source = tokenData.source || TokenSourceEnum.WALKIN;
+    const now = new Date();
+    
+    // For OPD Consultation, check doctor availability and slot capacity
+    let doctorId = tokenData.doctorId;
+    if (department && department.category === DepartmentCategoryEnum.OPD_CONSULTATION && doctorId) {
+      // If this is a walk-in request for a specific doctor, verify slots are available
+      if (source === TokenSourceEnum.WALKIN) {
+        // Get current hour for availability check
+        const currentHour = now.getHours();
+        
+        // Check if doctor is available now
+        const isAvailable = await this.checkDoctorAvailability(doctorId, now, currentHour);
+        if (!isAvailable) {
+          throw new Error("Doctor is not available during this hour");
+        }
+        
+        // Check if walk-in slots are available
+        const slot = await this.getDoctorSlot(doctorId, now, currentHour);
+        if (slot.remainingWalkInSlots <= 0) {
+          throw new Error("No walk-in slots available for this doctor at this time");
+        }
+      }
+      // For appointments, we'll validate the appointment time in the route handler
+    }
+    
+    // Set the check-in time for walk-ins
+    let checkInAt = undefined;
+    if (source === TokenSourceEnum.WALKIN) {
+      checkInAt = now;
     }
     
     // Create token
     const [token] = await db
       .insert(tokens)
-      .values({ ...tokenData, tokenNumber, doctorId })
+      .values({ 
+        ...tokenData, 
+        tokenNumber, 
+        doctorId,
+        source,
+        checkInAt
+      })
       .returning();
 
     // Get patient details
@@ -747,6 +794,198 @@ export class DatabaseStorage implements IStorage {
       console.error('Error deleting doctor:', error);
       return false;
     }
+  }
+  
+  async getDoctorAvailabilities(doctorId: string): Promise<Availability[]> {
+    return await db
+      .select()
+      .from(availabilities)
+      .where(eq(availabilities.doctorId, doctorId))
+      .orderBy(availabilities.dayOfWeek, availabilities.startHour);
+  }
+  
+  async createDoctorAvailability(availability: InsertAvailability): Promise<Availability> {
+    // Check for overlapping time slots first
+    const existingAvailabilities = await this.getDoctorAvailabilities(availability.doctorId);
+    
+    // Check if the new availability overlaps with any existing one for the same day
+    const overlapping = existingAvailabilities.find(
+      existing => 
+        existing.dayOfWeek === availability.dayOfWeek &&
+        ((availability.startHour < existing.endHour && availability.startHour >= existing.startHour) ||
+        (availability.endHour <= existing.endHour && availability.endHour > existing.startHour) ||
+        (availability.startHour <= existing.startHour && availability.endHour >= existing.endHour))
+    );
+    
+    if (overlapping) {
+      throw new Error(`Overlapping availability found for day ${availability.dayOfWeek}`);
+    }
+    
+    // Create the new availability
+    const [newAvailability] = await db
+      .insert(availabilities)
+      .values(availability)
+      .returning();
+      
+    return newAvailability;
+  }
+  
+  async updateDoctorAvailability(id: string, data: Partial<Availability>): Promise<Availability | undefined> {
+    if (data.startHour !== undefined && data.endHour !== undefined && data.dayOfWeek !== undefined) {
+      // Check for overlapping time slots, excluding this one
+      const [currentAvailability] = await db
+        .select()
+        .from(availabilities)
+        .where(eq(availabilities.id, id));
+      
+      if (!currentAvailability) {
+        throw new Error(`Availability with id ${id} not found`);
+      }
+      
+      const existingAvailabilities = await db
+        .select()
+        .from(availabilities)
+        .where(
+          and(
+            eq(availabilities.doctorId, currentAvailability.doctorId),
+            eq(availabilities.dayOfWeek, data.dayOfWeek), 
+            not(eq(availabilities.id, id))
+          )
+        );
+      
+      // Check if the updated availability would overlap with any existing one
+      const startHour = data.startHour!;
+      const endHour = data.endHour!;
+      
+      const overlapping = existingAvailabilities.find(
+        existing => 
+          ((startHour < existing.endHour && startHour >= existing.startHour) ||
+          (endHour <= existing.endHour && endHour > existing.startHour) ||
+          (startHour <= existing.startHour && endHour >= existing.endHour))
+      );
+      
+      if (overlapping) {
+        throw new Error(`Overlapping availability found for day ${data.dayOfWeek}`);
+      }
+    }
+    
+    // Update the availability
+    const [updatedAvailability] = await db
+      .update(availabilities)
+      .set(data)
+      .where(eq(availabilities.id, id))
+      .returning();
+      
+    return updatedAvailability;
+  }
+  
+  async deleteDoctorAvailability(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(availabilities).where(eq(availabilities.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting availability:', error);
+      return false;
+    }
+  }
+  
+  async checkDoctorAvailability(doctorId: string, date: Date, hour: number): Promise<boolean> {
+    // Get the day of week (0 = Sunday, 6 = Saturday)
+    const dayOfWeek = getDay(date);
+    
+    // Find availabilities for this doctor on this day that include this hour
+    const results = await db
+      .select()
+      .from(availabilities)
+      .where(
+        and(
+          eq(availabilities.doctorId, doctorId),
+          eq(availabilities.dayOfWeek, dayOfWeek),
+          lte(availabilities.startHour, hour),
+          gt(availabilities.endHour, hour)
+        )
+      );
+      
+    return results.length > 0;
+  }
+  
+  async getDoctorSlot(doctorId: string, date: Date, hour: number): Promise<DoctorSlot> {
+    // Default slot availability
+    const defaultSlot: DoctorSlot = {
+      bookedAppointments: 0,
+      walkInsIssued: 0,
+      appointmentSlotsPerHour: 0,
+      walkInSlotsPerHour: 0,
+      isAvailable: false,
+      remainingWalkInSlots: 0
+    };
+    
+    // Get doctor details
+    const doctor = await this.getDoctor(doctorId);
+    if (!doctor) {
+      return defaultSlot;
+    }
+    
+    // Check if doctor is available at this time
+    const isAvailable = await this.checkDoctorAvailability(doctorId, date, hour);
+    if (!isAvailable) {
+      return {
+        ...defaultSlot,
+        appointmentSlotsPerHour: doctor.appointmentSlotsPerHour,
+        walkInSlotsPerHour: doctor.walkInSlotsPerHour
+      };
+    }
+    
+    // Set start and end of the hour
+    const startOfHour = new Date(date);
+    startOfHour.setHours(hour, 0, 0, 0);
+    
+    const endOfHour = new Date(date);
+    endOfHour.setHours(hour, 59, 59, 999);
+    
+    // Count booked appointments for this hour
+    const bookedAppointments = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tokens)
+      .where(
+        and(
+          eq(tokens.doctorId, doctorId),
+          eq(tokens.source, TokenSourceEnum.APPOINTMENT),
+          between(tokens.appointmentTime, startOfHour, endOfHour)
+        )
+      );
+    
+    // Count walk-ins for this hour
+    const walkInsIssued = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tokens)
+      .where(
+        and(
+          eq(tokens.doctorId, doctorId),
+          eq(tokens.source, TokenSourceEnum.WALKIN),
+          between(tokens.issuedAt, startOfHour, endOfHour)
+        )
+      );
+    
+    // Calculate remaining walk-in slots
+    const bookedCount = bookedAppointments[0]?.count || 0;
+    const walkInCount = walkInsIssued[0]?.count || 0;
+    
+    // Walk-in slots formula: If appointments are less than max, allow overflow to walk-ins
+    const maxWalkInSlots = bookedCount < doctor.appointmentSlotsPerHour 
+      ? doctor.walkInSlotsPerHour + (doctor.appointmentSlotsPerHour - bookedCount)
+      : doctor.walkInSlotsPerHour;
+      
+    const remainingWalkInSlots = Math.max(0, maxWalkInSlots - walkInCount);
+    
+    return {
+      bookedAppointments: bookedCount,
+      walkInsIssued: walkInCount,
+      appointmentSlotsPerHour: doctor.appointmentSlotsPerHour,
+      walkInSlotsPerHour: doctor.walkInSlotsPerHour,
+      isAvailable: true,
+      remainingWalkInSlots
+    };
   }
 
   // Token advanced methods
