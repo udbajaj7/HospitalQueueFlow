@@ -28,45 +28,29 @@ async function setupDemoData() {
     });
     
     console.log("Setting up doctors...");
+    // Create Dr. Smith with UUID
+    const drSmithId = uuidv4();
     await db.insert(doctors).values({
-      id: 'dr-smith',
+      id: drSmithId,
       name: 'Dr. Smith',
       departmentCode: 'opd-demo',
-      specialization: 'General Medicine',
       appointmentSlotsPerHour: 3,
       walkInSlotsPerHour: 2,
       active: true
-    }).onConflictDoUpdate({
-      target: doctors.id,
-      set: { 
-        name: 'Dr. Smith',
-        departmentCode: 'opd-demo',
-        specialization: 'General Medicine',
-        appointmentSlotsPerHour: 3,
-        walkInSlotsPerHour: 2,
-        active: true
-      }
     });
+    console.log(`Created Dr. Smith with ID: ${drSmithId}`);
     
+    // Create Dr. Jones with UUID
+    const drJonesId = uuidv4();
     await db.insert(doctors).values({
-      id: 'dr-jones',
+      id: drJonesId,
       name: 'Dr. Jones',
       departmentCode: 'opd-demo',
-      specialization: 'Cardiology',
       appointmentSlotsPerHour: 4,
       walkInSlotsPerHour: 1,
       active: true
-    }).onConflictDoUpdate({
-      target: doctors.id,
-      set: { 
-        name: 'Dr. Jones',
-        departmentCode: 'opd-demo',
-        specialization: 'Cardiology',
-        appointmentSlotsPerHour: 4,
-        walkInSlotsPerHour: 1,
-        active: true
-      }
     });
+    console.log(`Created Dr. Jones with ID: ${drJonesId}`);
     
     console.log("Adding today's availability for both doctors...");
     // Get today's day of week (0-6, where 0 = Sunday)
@@ -75,56 +59,44 @@ async function setupDemoData() {
     
     // Add availability for Dr. Smith today
     await db.insert(availabilities).values({
-      doctorId: 'dr-smith',
+      doctorId: drSmithId,
       dayOfWeek,
       startHour: 9,
       endHour: 17
-    }).onConflictDoNothing();
+    });
     
     // Add availability for Dr. Jones today
     await db.insert(availabilities).values({
-      doctorId: 'dr-jones',
+      doctorId: drJonesId,
       dayOfWeek,
       startHour: 9,
       endHour: 17
-    }).onConflictDoNothing();
+    });
     
     console.log("Creating some test patients...");
+    const patient1Id = uuidv4();
     await db.insert(patients).values({
-      id: 'patient-1',
+      id: patient1Id,
       name: 'John Smith',
       mrn: 'MRN001',
       mobile: '+1234567890',
       email: 'john@example.com',
       dateOfBirth: new Date('1980-05-15'),
       gender: 'male'
-    }).onConflictDoUpdate({
-      target: patients.id,
-      set: {
-        name: 'John Smith',
-        mrn: 'MRN001',
-        mobile: '+1234567890',
-        email: 'john@example.com'
-      }
     });
+    console.log(`Created patient John Smith with ID: ${patient1Id}`);
     
+    const patient2Id = uuidv4();
     await db.insert(patients).values({
-      id: 'patient-2',
+      id: patient2Id,
       name: 'Jane Doe',
       mrn: 'MRN002',
       mobile: '+0987654321',
       email: 'jane@example.com',
       dateOfBirth: new Date('1975-10-20'),
       gender: 'female'
-    }).onConflictDoUpdate({
-      target: patients.id,
-      set: {
-        name: 'Jane Doe',
-        mrn: 'MRN002',
-        mobile: '+0987654321',
-        email: 'jane@example.com'
-      }
     });
+    console.log(`Created patient Jane Doe with ID: ${patient2Id}`);
     
     console.log("Demo data setup completed successfully!");
   } catch (error) {
