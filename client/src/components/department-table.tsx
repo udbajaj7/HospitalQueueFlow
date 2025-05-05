@@ -32,8 +32,6 @@ interface DepartmentTableProps {
 const DepartmentTable: React.FC<DepartmentTableProps> = ({ onEdit }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null);
-  
   // Fetch departments
   const { data: departments, isLoading } = useQuery<Department[]>({
     queryKey: ['/api/departments'],
@@ -42,34 +40,6 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({ onEdit }) => {
   // Fetch department stats
   const { data: departmentStats } = useQuery({
     queryKey: ['/api/stats/departments'],
-  });
-  
-  // Delete department mutation
-  const deleteDepartmentMutation = useMutation({
-    mutationFn: async (code: string) => {
-      const response = await apiRequest('DELETE', `/api/departments/${code}`);
-      return response.json();
-    },
-    onSuccess: () => {
-      // Invalidate queries to refetch data
-      queryClient.invalidateQueries({ queryKey: ['/api/departments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stats/departments'] });
-      
-      toast({
-        title: 'Department deleted',
-        description: 'The department has been deleted successfully.',
-      });
-      
-      // Close delete dialog
-      setDeletingDepartment(null);
-    },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to delete department: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive',
-      });
-    },
   });
   
   // Function to get stats for a department
@@ -194,17 +164,10 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({ onEdit }) => {
                     <TableCell className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <Button
                         variant="link"
-                        className="text-teal-600 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300 mr-3"
+                        className="text-teal-600 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-300"
                         onClick={() => onEdit(department)}
                       >
                         Edit
-                      </Button>
-                      <Button
-                        variant="link"
-                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                        onClick={() => handleDelete(department)}
-                      >
-                        Delete
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -214,27 +177,6 @@ const DepartmentTable: React.FC<DepartmentTableProps> = ({ onEdit }) => {
           </Table>
         </div>
       </div>
-      
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deletingDepartment} onOpenChange={() => setDeletingDepartment(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Department</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the department "{deletingDepartment?.name}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmDelete}
-              className="bg-red-500 hover:bg-red-600"
-            >
-              {deleteDepartmentMutation.isPending ? 'Deleting...' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };
