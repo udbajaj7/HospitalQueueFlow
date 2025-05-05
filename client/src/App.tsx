@@ -12,6 +12,8 @@ import AdminDashboard from "@/pages/admin/index";
 import AdminDepartments from "@/pages/admin/departments";
 import AdminUsers from "@/pages/admin/users";
 import AdminDoctors from "@/pages/admin/doctors";
+import AdminAnalytics from "@/pages/admin/analytics";
+import AdminSettings from "@/pages/admin/settings";
 import StaffDashboard from "@/pages/staff/index";
 import StaffReports from "@/pages/staff/reports";
 import StaffSettings from "@/pages/staff/settings";
@@ -88,6 +90,20 @@ function Router() {
         <ProtectedRoute roles={[Roles.ADMIN]}>
           <Admin>
             <AdminDoctors />
+          </Admin>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/analytics">
+        <ProtectedRoute roles={[Roles.ADMIN]}>
+          <Admin>
+            <AdminAnalytics />
+          </Admin>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/settings">
+        <ProtectedRoute roles={[Roles.ADMIN]}>
+          <Admin>
+            <AdminSettings />
           </Admin>
         </ProtectedRoute>
       </Route>
