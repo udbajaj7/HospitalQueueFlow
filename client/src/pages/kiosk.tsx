@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Link } from 'wouter';
 import TokenForm from '@/components/token-form';
 import TokenDisplay from '@/components/token-display';
+import { WalkInForm } from '@/components/walk-in-form';
+import { AppointmentCheckInForm } from '@/components/appointment-check-in-form';
 import QueueStatus from '@/components/queue-status';
 import { Card, CardContent } from '@/components/ui/card';
-import { Hospital } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Hospital, Users, CalendarCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 const Kiosk = () => {
@@ -12,27 +15,9 @@ const Kiosk = () => {
   const [showForm, setShowForm] = useState(true);
 
   // Fetch departments for the token display
-  const { data: departments } = useQuery({
+  const { data: departments = [] } = useQuery<Array<{ code: string; name: string }>>({
     queryKey: ['/api/departments'],
   });
-
-  // Handle token generation success
-  const handleTokenSuccess = (data: any) => {
-    setTokenData(data);
-    setShowForm(false);
-  };
-
-  // Handle new token button
-  const handleNewToken = () => {
-    setShowForm(true);
-  };
-
-  // Find department details
-  const getDepartmentName = (code: string) => {
-    if (!departments) return code;
-    const department = departments.find((dept: any) => dept.code === code);
-    return department?.name || code;
-  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -60,23 +45,27 @@ const Kiosk = () => {
       <main className="flex-grow max-w-5xl mx-auto w-full px-4 py-8">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
-            {showForm ? 'Generate New Token' : 'Token Generated'}
+            Patient Registration
           </h2>
           
-          {showForm ? (
-            <TokenForm onSuccess={handleTokenSuccess} />
-          ) : (
-            tokenData && (
-              <TokenDisplay 
-                token={tokenData} 
-                patient={tokenData.patient} 
-                department={{
-                  name: getDepartmentName(tokenData.departmentCode)
-                }}
-                onNewToken={handleNewToken}
-              />
-            )
-          )}
+          <Tabs defaultValue="walk-in" className="mt-6">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="walk-in" className="text-base flex items-center">
+                <Users className="mr-2 h-4 w-4" /> Walk-in Patient
+              </TabsTrigger>
+              <TabsTrigger value="appointment" className="text-base flex items-center">
+                <CalendarCheck className="mr-2 h-4 w-4" /> Appointment Check-in
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="walk-in">
+              <WalkInForm />
+            </TabsContent>
+            
+            <TabsContent value="appointment">
+              <AppointmentCheckInForm />
+            </TabsContent>
+          </Tabs>
         </div>
         
         <div className="mt-8 bg-white dark:bg-slate-800 rounded-lg shadow-md p-6">

@@ -94,6 +94,20 @@ function Router() {
           </Admin>
         </ProtectedRoute>
       </Route>
+      <Route path="/admin/doctors/new">
+        <ProtectedRoute roles={[Roles.ADMIN]}>
+          <Admin>
+            <DoctorFormPage />
+          </Admin>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/doctors/edit/:id">
+        <ProtectedRoute roles={[Roles.ADMIN]}>
+          <Admin>
+            <DoctorFormPage />
+          </Admin>
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin/analytics">
         <ProtectedRoute roles={[Roles.ADMIN]}>
           <Admin>
