@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket Test</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif;
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 20px;
+    }
+    #status { 
+      padding: 10px; 
+      margin-bottom: 10px; 
+      border-radius: 4px;
+    }
+    .connected { background-color: #d4edda; color: #155724; }
+    .disconnected { background-color: #f8d7da; color: #721c24; }
+    .connecting { background-color: #fff3cd; color: #856404; }
+    #log {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-bottom: 20px;
+      font-family: monospace;
+      background-color: #f8f9fa;
+    }
+    button {
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0069d9;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebSocket Connection Test</h1>
+  <div id="status" class="connecting">Connecting...</div>
+  
+  <div>
+    <button id="connect">Connect</button>
+    <button id="disconnect">Disconnect</button>
+  </div>
+  
+  <h2>Connection Log:</h2>
+  <div id="log"></div>
+  
+  <script>
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    const connectBtn = document.getElementById('connect');
+    const disconnectBtn = document.getElementById('disconnect');
+    
+    let socket = null;
+    
+    function log(message) {
+      const time = new Date().toLocaleTimeString();
+      logEl.innerHTML += `<div>[${time}] ${message}</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    function setStatus(status) {
+      statusEl.className = status;
+      if (status === 'connected') {
+        statusEl.textContent = 'Connected to WebSocket server';
+      } else if (status === 'disconnected') {
+        statusEl.textContent = 'Disconnected from WebSocket server';
+      } else {
+        statusEl.textContent = 'Connecting to WebSocket server...';
+      }
+    }
+    
+    function connectWebSocket() {
+      if (socket && socket.readyState !== WebSocket.CLOSED) {
+        log('Socket is already open or connecting');
+        return;
+      }
+      
+      setStatus('connecting');
+      
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+      
+      log(`Connecting to ${wsUrl}`);
+      
+      try {
+        socket = new WebSocket(wsUrl);
+        
+        socket.onopen = function() {
+          log('WebSocket connection established');
+          setStatus('connected');
+        };
+        
+        socket.onmessage = function(event) {
+          try {
+            const message = JSON.parse(event.data);
+            log(`Received message: ${JSON.stringify(message, null, 2)}`);
+          } catch (error) {
+            log(`Received raw message: ${event.data}`);
+          }
+        };
+        
+        socket.onclose = function(event) {
+          log(`WebSocket connection closed: Code ${event.code}${event.reason ? ` Reason: ${event.reason}` : ''}`);
+          setStatus('disconnected');
+        };
+        
+        socket.onerror = function(error) {
+          log('WebSocket error occurred');
+          console.error('WebSocket error:', error);
+        };
+      } catch (error) {
+        log(`Failed to create WebSocket: ${error.message}`);
+        setStatus('disconnected');
+      }
+    }
+    
+    function disconnectWebSocket() {
+      if (socket) {
+        log('Closing WebSocket connection');
+        socket.close();
+        socket = null;
+      } else {
+        log('No active WebSocket connection to close');
+      }
+    }
+    
+    connectBtn.addEventListener('click', connectWebSocket);
+    disconnectBtn.addEventListener('click', disconnectWebSocket);
+    
+    // Connect on page load
+    connectWebSocket();
+  </script>
+</body>
+</html>

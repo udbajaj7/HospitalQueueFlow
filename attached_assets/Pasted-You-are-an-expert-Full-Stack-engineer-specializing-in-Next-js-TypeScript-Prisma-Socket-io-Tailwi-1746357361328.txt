@@ -1,0 +1,107 @@
+You are an expert Full-Stack engineer specializing in Next.js, TypeScript, Prisma, Socket.io, Tailwind CSS, NextAuth.js, Twilio WhatsApp and real-time web applications.
+
+Project: RGCIRC Queue Management System
+
+Requirements:
+
+Tech Stack
+
+Next.js 13+ (App Router) with TypeScript
+
+Tailwind CSS for styling (clean, accessible, responsive)
+
+Prisma ORM + PostgreSQL (connection via DATABASE_URL)
+
+NextAuth.js for Authentication & Role-Based Access (roles: kiosk, staff, admin)
+
+Socket.io for real-time queue updates
+
+Twilio WhatsApp API for notifications
+
+Simple predictive wait-time API: calculate “average service time × queue length”
+
+PWA support via next-pwa
+
+Database Models (Prisma schema)
+
+prisma
+Copy
+Edit
+model Patient { id String @id @default(uuid()); name String; mrn String? @unique; mobile String; tokens Token[]; createdAt DateTime @default(now()); updatedAt DateTime @updatedAt; }
+model Token { id String @id @default(uuid()); tokenNumber String; departmentCode String; priority Priority @default(NORMAL); status Status @default(ISSUED); issuedAt DateTime @default(now()); calledAt DateTime?; servedAt DateTime?; patient Patient @relation(fields: [patientId], references: [id]); patientId String; }
+model Department { code String @id; name String; slaThreshold Int; tokens Token[]; }
+enum Priority { NORMAL EMERGENCY FOLLOW_UP }
+enum Status { ISSUED CALLED SERVED NO_SHOW }
+Pages & API Routes
+
+Kiosk UI (/kiosk)
+
+Form: Patient Name, MRN, Mobile, Department (dropdown), Priority (radio)
+
+On Submit → POST /api/tokens → return { tokenNumber, estimatedWait }
+
+Show token and estimated wait, buttons: Print, Send WhatsApp
+
+Staff Dashboard (/staff)
+
+Protected (NextAuth role=“staff”)
+
+Real-time queue table via Socket.io: Token No, Name, Status, IssuedAt, WaitTime
+
+Actions: Call Next (PUT /api/tokens/:id/status), Mark Served, No-Show
+
+Admin Console (/admin)
+
+Protected (role=“admin”)
+
+CRUD Departments & Priority Rules (form modals)
+
+User Management: Invite staff/kiosk/admin via email (NextAuth email link)
+
+Analytics: average wait, throughput, no-show rates (charts via Recharts)
+
+API (/pages/api)
+
+POST /api/tokens → validate/create Patient, create Token, compute estimatedWait = avgServiceTime(dept) * currentQueueLength, emit token.created Socket.io event, send WhatsApp via Twilio, return JSON
+
+PUT /api/tokens/:id/status → update status, timestamps, emit token.called/served/no_show
+
+GET /api/queues?department=code → list issued tokens
+
+POST /api/hms/* stub endpoints to proxy HMS calls (use node-fetch or axios)
+
+GET /api/predict?dept=code → return wait estimate from simple linear model or constant config
+
+Real-Time
+
+Initialize Socket.io server in a custom Next.js server (server.js) or with next-socket.io—broadcast on token events.
+
+React hook useQueue(department) to subscribe to updates.
+
+Auth & RBAC
+
+Configure NextAuth.js with Credentials Provider or Email Link; extend session to include role.
+
+Create withRole(page, role) HOC for page protection in both server and client.
+
+Twilio WhatsApp Integration
+
+Install twilio SDK; store TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM in env.
+
+On token creation, call client.messages.create({ from: 'whatsapp:${TWILIO_WHATSAPP_FROM}', to: 'whatsapp:'+patient.mobile, body: template }), log to NotificationLog table.
+
+Styling & PWA
+
+Use Tailwind components; implement light/dark mode.
+
+Add next-pwa with cache-first for static assets and network-first for API calls.
+
+Scripts & Dev
+
+npm run dev → Next.js + Socket.io
+
+npm run build && npm start → production
+
+prisma migrate dev --name init → DB migrations
+
+Deliverable: A fully functioning Next.js repo with all pages, API routes, real-time logic, database models, auth, PWA support, predictive wait-time, and Twilio WhatsApp notifications—ready to deploy on Vercel or Replit.

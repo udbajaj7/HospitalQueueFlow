@@ -1,0 +1,108 @@
+You are an expert full-stack engineer working with Next.js 13+, TypeScript, Tailwind CSS, Prisma, NextAuth.js, Socket.io, and PostgreSQL. The app you generated already includes a kiosk page and an admin dashboard. Now you need to enhance it by adding a Staff Dashboard with the following features and constraints:
+
+1. Access Control
+Only users with the “staff” role can access /staff pages.
+
+Each staff user is associated with exactly one Department in the database.
+
+The Administrator (role=“admin”) can assign or change a staff user’s department via the Admin Dashboard user-management UI.
+
+On login, NextAuth.js must include session.user.departmentCode in the JWT/session.
+
+2. Data Models & Timestamps
+Extend your Prisma schema with these fields on the Token model:
+
+prisma
+Copy
+Edit
+model Token {
+  // existing fields…
+  checkInAt   DateTime?    // when the patient checked in at kiosk
+  startAt     DateTime?    // when appointment started
+  endAt       DateTime?    // when appointment ended
+}
+Create a new Doctor model and a many-to-many relation to Department (one dept ⇒ many doctors):
+
+prisma
+Copy
+Edit
+model Doctor {
+  id          String   @id @default(uuid())
+  name        String
+  department  Department @relation(fields:[departmentCode], references:[code])
+  departmentCode String
+  tokens      Token[]  @relation("DoctorQueue")
+}
+Each Token belongs to a Doctor once the patient selects or is assigned to that doctor.
+
+3. Staff Dashboard UI (/staff)
+Department Header: Show current Department.name.
+
+Doctor Tabs: A tab bar listing each Doctor in the department; clicking a tab shows that doctor’s queue.
+
+Queue Table for selected doctor:
+
+Token No	Patient Name	Status	Checked-in At	Estimated Wait	Action
+A0123	John Doe	Issued	2025-05-04 09:15	10 min	[Next] [Hold] [VIP] [Reschedule]
+A0124	Jane Smith	Called	09:17	—	—
+
+Unarrived List: Below or in a sidebar, list patients who have an appointment today in this department but have no checkInAt. Columns: Patient Name, MRN, Appointment Time.
+
+4. Staff Actions
+For the currently active doctor queue:
+
+Next button
+
+If a token is in status Called or Held, its endAt = now().
+
+Update next Issued token to status Called, set its startAt = now(), emit Socket.io event "token.update".
+
+Hold button
+
+Change current token status to Held, leave startAt unchanged.
+
+Do not advance queue.
+
+VIP/Emergency button
+
+Prompt staff to select an existing Issued token or enter a one-off VIP token.
+
+Move that token to top of queue (position 1), update status to Called, set startAt = now().
+
+Reschedule button
+
+Allow drag-and-drop reordering of the Issued tokens in the table.
+
+Persist new position field on Token so the queue order is saved.
+
+5. API Routes & Real-Time
+GET /api/staff/queues?department=code → returns all doctors in the department and their token queues (only statuses Issued, Called, Held).
+
+POST /api/tokens/:id/actions with payload { action: 'next'|'hold'|'vip'|'reschedule', data?: any } → perform the logic above, update timestamps and positions.
+
+GET /api/staff/unarrived?department=code → returns patients with appointments today but checkInAt == null.
+
+Broadcast all token updates via Socket.io under namespace /staff with events token.updated carrying full Token record.
+
+6. Database Migrations
+Generate a new migration after updating your Prisma schema.
+
+Use prisma migrate dev to apply and test locally.
+
+7. Frontend Implementation
+Use React Server Components for data fetching of initial queues.
+
+Use React Client Components for interactive table (drag-and-drop via react-beautiful-dnd or similar) and action buttons.
+
+Use your existing useSocket() hook to subscribe to token updates and update UI in real time.
+
+Guard the /staff route with a withRole('staff') HOC that also checks session.user.departmentCode.
+
+8. Styling & UX
+Continue using Tailwind utility classes, ensure tables are responsive and accessible.
+
+Use icons (e.g., Lucide “play” for Next, “pause” for Hold, “star” for VIP).
+
+Show toast notifications on successful actions (e.g., “Token A0123 moved to VIP”).
+
+Deliverable: Update the existing Replit Next.js repo so that /staff pages implement the above UI, actions, API routes, real-time sync, and timestamp tracking, all constrained to the staff user’s department, with admin-driven assignment of staff to departments.
