@@ -12,6 +12,7 @@ import AdminDashboard from "@/pages/admin/index";
 import AdminDepartments from "@/pages/admin/departments";
 import AdminUsers from "@/pages/admin/users";
 import AdminDoctors from "@/pages/admin/doctors";
+import DoctorFormPage from "@/pages/admin/doctor-form-page";
 import AdminAnalytics from "@/pages/admin/analytics";
 import AdminSettings from "@/pages/admin/settings";
 import StaffDashboard from "@/pages/staff/index";
