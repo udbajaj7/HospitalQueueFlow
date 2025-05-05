@@ -32,8 +32,10 @@ const Kiosk = () => {
             </div>
             <div className="hidden md:flex items-center space-x-3">
               <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100 rounded-full text-sm">Kiosk Mode</span>
-              <Link href="/login" className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                Admin Login
+              <Link href="/login">
+                <a className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                  Admin Login
+                </a>
               </Link>
             </div>
           </div>

@@ -70,12 +70,23 @@ export function AppointmentCheckInForm() {
   // Verify appointment mutation
   const verifyAppointmentMutation = useMutation({
     mutationFn: async (data: { code?: string; mobile?: string }) => {
-      return await apiRequest("POST", "/api/appointments/verify", data);
+      const response = await fetch("/api/appointments/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to verify appointment");
+      }
+      
+      return await response.json();
     },
-    onSuccess: async (response) => {
+    onSuccess: (data) => {
       try {
-        const data = await response.json();
-        
         if (!data || (Array.isArray(data) && data.length === 0)) {
           setCheckInError("No appointment found with the provided details");
           return;
@@ -119,10 +130,22 @@ export function AppointmentCheckInForm() {
   // Check-in appointment mutation
   const checkInMutation = useMutation({
     mutationFn: async (appointmentId: string) => {
-      return await apiRequest("POST", `/api/appointments/${appointmentId}/check-in`, {});
+      const response = await fetch(`/api/appointments/${appointmentId}/check-in`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to check in");
+      }
+      
+      return await response.json();
     },
-    onSuccess: async (response) => {
-      const data = await response.json();
+    onSuccess: (data) => {
       setTokenCreated(data);
       queryClient.invalidateQueries({ queryKey: ["/api/tokens"] });
       

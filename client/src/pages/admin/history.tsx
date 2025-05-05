@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { format, sub } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
@@ -39,15 +38,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarIcon, Download, Search } from "lucide-react";
 import { formatWaitTime, getStatusText, getPriorityText } from "@/lib/utils";
 
-export default function ReportsPage() {
+export default function HistoryPage() {
   const { user } = useAuth();
   const { data: departments, isLoading: isLoadingDepartments } = useDepartments();
   
   // Default to last 7 days
   const [startDate, setStartDate] = useState<Date | undefined>(sub(new Date(), { days: 7 }));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
-  // Enforce department restriction for staff
-  const [departmentCode, setDepartmentCode] = useState<string>(user?.departmentCode || '');
+  const [departmentCode, setDepartmentCode] = useState<string>('all');
   
   // Get token history based on selected filters
   const { 
@@ -178,14 +176,28 @@ export default function ReportsPage() {
                 </Popover>
               </div>
               
-              {/* Department selection has been removed - staff can only see their assigned department */}
               <div className="flex-1">
                 <label className="block text-sm font-medium mb-1">Department</label>
-                <div className="h-10 px-3 py-2 rounded-md border border-input bg-background flex items-center">
-                  <span className="text-sm">
-                    {departments?.find(dept => dept.code === departmentCode)?.name || 'Loading...'}
-                  </span>
-                </div>
+                {isLoadingDepartments ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <Select 
+                    value={departmentCode} 
+                    onValueChange={setDepartmentCode}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departments?.map((dept: { code: string; name: string }) => (
+                        <SelectItem key={dept.code} value={dept.code}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               
               <div className="flex-none self-end md:self-end pt-4 md:pt-0">

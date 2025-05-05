@@ -19,7 +19,8 @@ const StaffDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(user?.departmentCode || 'all');
+  // For staff users, we want to enforce using their assigned department
+  const [selectedDepartment, setSelectedDepartment] = useState<string>(user?.departmentCode || '');
 
   // Fetch departments
   const { data: departments = [], isLoading: loadingDepartments } = useQuery<Array<{code: string, name: string}>>({
@@ -150,28 +151,7 @@ const StaffDashboard = () => {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage patient queue and token status</p>
         </div>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-          <div className="relative">
-            {loadingDepartments ? (
-              <Skeleton className="h-10 w-48" />
-            ) : (
-              <Select
-                value={selectedDepartment}
-                onValueChange={handleDepartmentChange}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments?.map((dept: { code: string; name: string }) => (
-                    <SelectItem key={dept.code} value={dept.code}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+          {/* Department selection has been removed - staff can only see their assigned department */}
           <Button
             type="button"
             className="bg-teal-600 hover:bg-teal-700"
