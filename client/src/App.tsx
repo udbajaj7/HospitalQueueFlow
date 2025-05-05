@@ -14,7 +14,6 @@ import AdminUsers from "@/pages/admin/users";
 import AdminDoctors from "@/pages/admin/doctors";
 import DoctorFormPage from "@/pages/admin/doctor-form-page";
 import AdminAnalytics from "@/pages/admin/analytics";
-import AdminHistory from "@/pages/admin/history";
 import AdminSettings from "@/pages/admin/settings";
 import StaffDashboard from "@/pages/staff/index";
 import StaffReports from "@/pages/staff/reports";
@@ -113,13 +112,6 @@ function Router() {
         <ProtectedRoute roles={[Roles.ADMIN]}>
           <Admin>
             <AdminAnalytics />
-          </Admin>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/admin/history">
-        <ProtectedRoute roles={[Roles.ADMIN]}>
-          <Admin>
-            <AdminHistory />
           </Admin>
         </ProtectedRoute>
       </Route>
