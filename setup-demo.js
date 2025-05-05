@@ -1,11 +1,12 @@
 // This is a more direct approach to add demo data to our database
-import { db } from './server/db.js';
+import { db } from './server/db.ts';
 import { 
   departments, 
   doctors,
   availabilities,
   patients
-} from './shared/schema.js';
+} from './shared/schema.ts';
+import { v4 as uuidv4 } from 'uuid';
 
 async function setupDemoData() {
   try {
