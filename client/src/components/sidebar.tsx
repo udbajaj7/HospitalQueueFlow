@@ -24,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ type }) => {
         { href: `${baseUrl}/doctors`, icon: <Stethoscope className="w-5" />, label: 'Doctors' },
         { href: `${baseUrl}/users`, icon: <User className="w-5" />, label: 'User Management' },
         { href: `${baseUrl}/analytics`, icon: <BarChart className="w-5" />, label: 'Analytics' },
+        { href: `${baseUrl}/history`, icon: <ListOrdered className="w-5" />, label: 'History' },
         { href: `${baseUrl}/settings`, icon: <Settings className="w-5" />, label: 'Settings' },
       ]
     : [

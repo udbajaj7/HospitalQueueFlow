@@ -17,6 +17,7 @@ const MobileNav: React.FC<MobileNavProps> = ({ type }) => {
         { href: baseUrl, icon: <BarChart className="h-5 w-5" />, label: 'Dashboard' },
         { href: `${baseUrl}/departments`, icon: <Settings className="h-5 w-5" />, label: 'Departments' },
         { href: `${baseUrl}/users`, icon: <User className="h-5 w-5" />, label: 'Users' },
+        { href: `${baseUrl}/history`, icon: <ListOrdered className="h-5 w-5" />, label: 'History' },
         { href: `${baseUrl}/settings`, icon: <Settings className="h-5 w-5" />, label: 'Settings' },
       ]
     : [
