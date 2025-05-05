@@ -76,15 +76,7 @@ export function WalkInForm() {
     isLoading: isDoctorsLoading,
     refetch: refetchDoctors
   } = useQuery<Doctor[]>({
-    queryKey: ["/api/doctors"],
-    queryFn: async () => {
-      if (!selectedDepartment) return [];
-      const response = await fetch(`/api/doctors?department=${selectedDepartment}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch doctors for department");
-      }
-      return response.json();
-    },
+    queryKey: ["/api/doctors", { department: selectedDepartment }],
     enabled: !!selectedDepartment,
   });
   
